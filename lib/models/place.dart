@@ -31,20 +31,40 @@ class Place {
     required this.hasElevator,
   });
 
-  factory Place.fromJson(Map<String, dynamic> json) => Place(
-    id: json['id'] as int,
-    userId: json['user_id'] as String,
-    name: json['name'] as String,
-    lat: (json['lat'] as num).toDouble(),
-    lng: (json['lng'] as num).toDouble(),
-    title: json['title'] as String,
-    desc: json['desc'] as String,
-    website: json['website'] as String?,
-    address: json['address'] as String,
-    rentPrice: json['rent_price'] as int,
-    utilityPrice: json['utility_price'] as int,
-    commonCost: json['Common_cost'] as int,
-    floor: json['floor'] as int,
-    hasElevator: json['has_elevator'] == true,
-  );
+  factory Place.fromJson(Map<String, dynamic> json) {
+    // Helper function to safely parse int from any type
+    int _parseInt(dynamic value, [int defaultValue = 0]) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      if (value is num) return value.toInt();
+      return defaultValue;
+    }
+
+    // Helper function to safely parse double from any type
+    double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
+      if (value == null) return defaultValue;
+      if (value is double) return value;
+      if (value is String) return double.tryParse(value) ?? defaultValue;
+      if (value is num) return value.toDouble();
+      return defaultValue;
+    }
+
+    return Place(
+      id: _parseInt(json['id']),
+      userId: json['user_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      lat: _parseDouble(json['lat']),
+      lng: _parseDouble(json['lng']),
+      title: json['title']?.toString() ?? json['name']?.toString() ?? '',
+      desc: json['description']?.toString() ?? json['desc']?.toString() ?? '',
+      website: json['link']?.toString(),
+      address: json['address']?.toString() ?? '',
+      rentPrice: _parseInt(json['rent_price']),
+      utilityPrice: _parseInt(json['utility_cost'] ?? json['utility_price']),
+      commonCost: _parseInt(json['common_cost'] ?? json['Common_cost']),
+      floor: _parseInt(json['floor']),
+      hasElevator: json['has_elevator'] == true || json['has_elevator'] == 'true',
+    );
+  }
 }

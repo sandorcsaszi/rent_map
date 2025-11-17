@@ -1,7 +1,37 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/place.dart';
 
 class PlaceService {
   final _client = Supabase.instance.client;
+
+  Future<List<Place>> getUserPlaces() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Not logged in');
+    }
+
+    final response = await _client
+        .from('places')
+        .select()
+        .eq('user_id', user.id);
+
+    // Debug: naplózzuk a nyers adatokat
+    print('Places raw data: $response');
+
+    try {
+      final places = (response as List).map((json) {
+        print('Parsing place: $json');
+        return Place.fromJson(json);
+      }).toList();
+
+      print('Successfully parsed ${places.length} places');
+      return places;
+    } catch (e, stackTrace) {
+      print('Error parsing places: $e');
+      print('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
 
   Future<void> createPlace({
     required String name,
@@ -38,6 +68,6 @@ class PlaceService {
       'has_elevator': hasElevator,
     };
 
-    final res = await _client.from('places').insert(payload).select().single();
+    await _client.from('places').insert(payload).select().single();
   }
 }

@@ -1,7 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rent_map/screens/LoginScreen.dart';
-import 'package:rent_map/screens/MapScreen.dart';
+import 'package:rent_map/widgets/NavBar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -12,6 +13,11 @@ Future<void> main() async {
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    authOptions: FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+      // iOS-en automatikusan kezelje a deep link-eket
+      autoRefreshToken: true,
+    ),
   );
 
   runApp(const MyApp());
@@ -44,18 +50,28 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
     final supabase = Supabase.instance.client;
 
     // Initial session (after app start or cold start)
     _session = supabase.auth.currentSession;
-    _initialized = true;
 
+    // Listen to auth state changes
     supabase.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      setState(() {
-        _session = session;
-        _initialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _session = data.session;
+          _initialized = true;
+        });
+      }
+    });
+
+    // Mark as initialized after setting up listener
+    setState(() {
+      _initialized = true;
     });
   }
 
@@ -68,7 +84,7 @@ class _AuthGateState extends State<AuthGate> {
     if (_session == null) {
       return const LoginScreen();
     } else {
-      return Mapscreen(session: _session!);
+      return NavBar(session: _session!);
     }
   }
 }
