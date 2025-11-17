@@ -5,35 +5,38 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: ".env");
+  String status = 'not started';
 
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-  );
+  try {
+    status = 'loading .env';
+    await dotenv.load(fileName: ".env");
 
-  runApp(const MyApp());
+    status = 'initializing supabase';
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+
+    status = 'ok';
+  } catch (e, st) {
+    debugPrint('Startup error: $e');
+    debugPrint('Stack: $st');
+    status = 'error: $e';
+  }
+
+  runApp(MyApp(startupStatus: status));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String startupStatus;
+  const MyApp({super.key, required this.startupStatus});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Albiterkep',
       home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Supabase URL: ${dotenv.env['SUPABASE_URL'] ?? "NULL"}'),
-              const SizedBox(height: 8),
-              Text('Has Supabase client: ${Supabase.instance.client != null}'),
-            ],
-          ),
-        ),
+        body: Center(child: Text('Startup status: $startupStatus')),
       ),
     );
   }
