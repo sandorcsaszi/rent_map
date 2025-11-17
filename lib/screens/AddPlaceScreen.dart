@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:async';
 
 import '../services/PlaceService.dart';
+import '../services/GeocodingService.dart';
 
 class AddPlaceScreen extends StatefulWidget {
   final double lat;
@@ -28,9 +32,35 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   String? _error;
 
   final _placeService = PlaceService();
+  final _geocodingService = GeocodingService();
+  final _mapController = MapController();
+  final _addressFocusNode = FocusNode();
+
+  // Map and geocoding state
+  late double _currentLat;
+  late double _currentLng;
+  List<AddressSuggestion> _addressSuggestions = [];
+  bool _showSuggestions = false;
+  bool _isSearching = false;
+  Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentLat = widget.lat;
+    _currentLng = widget.lng;
+
+    // Listen to address field changes for autocomplete
+    _addressController.addListener(_onAddressChanged);
+
+    // Get initial address from coordinates
+    _loadInitialAddress();
+  }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _addressFocusNode.dispose();
     _nameController.dispose();
     _descController.dispose();
     _websiteController.dispose();
@@ -40,6 +70,101 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     _commonCostController.dispose();
     _floorController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadInitialAddress() async {
+    final suggestion = await _geocodingService.reverseGeocode(_currentLat, _currentLng);
+    if (suggestion != null && mounted) {
+      print('Got initial address: ${suggestion.displayName}');
+      // Remove listener temporarily to avoid triggering search
+      _addressController.removeListener(_onAddressChanged);
+      _addressController.text = suggestion.displayName;
+      _addressController.addListener(_onAddressChanged);
+    }
+  }
+
+  void _onAddressChanged() {
+    final text = _addressController.text;
+    print('Address changed: "$text" (length: ${text.length})');
+
+    // Debounce the search to avoid too many API calls
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      print('Debounce timer fired for: "$text"');
+      if (text.length >= 3) {
+        _searchAddress(text);
+      } else {
+        print('Text too short, clearing suggestions');
+        if (mounted) {
+          setState(() {
+            _addressSuggestions = [];
+            _showSuggestions = false;
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _searchAddress(String query) async {
+    print('Searching for: "$query"');
+    setState(() => _isSearching = true);
+
+    final suggestions = await _geocodingService.searchAddress(query);
+    print('Got ${suggestions.length} suggestions');
+
+    if (mounted) {
+      setState(() {
+        _addressSuggestions = suggestions;
+        _showSuggestions = suggestions.isNotEmpty;
+        _isSearching = false;
+      });
+      print('Show suggestions: $_showSuggestions');
+    }
+  }
+
+  void _selectAddress(AddressSuggestion suggestion) {
+    print('Selected address: ${suggestion.displayName}');
+
+    // Cancel any pending debounce timer
+    _debounceTimer?.cancel();
+
+    setState(() {
+      _currentLat = suggestion.lat;
+      _currentLng = suggestion.lng;
+      _showSuggestions = false;
+      _addressSuggestions = [];
+    });
+
+    // Set text after hiding suggestions to avoid retriggering search
+    _addressController.text = suggestion.displayName;
+
+    // Animate map to new location
+    _mapController.move(LatLng(suggestion.lat, suggestion.lng), 16.0);
+  }
+
+  void _onMapTap(TapPosition tapPosition, LatLng latlng) {
+    print('Map tapped at: ${latlng.latitude}, ${latlng.longitude}');
+
+    // Cancel any pending search
+    _debounceTimer?.cancel();
+
+    setState(() {
+      _currentLat = latlng.latitude;
+      _currentLng = latlng.longitude;
+      _showSuggestions = false;
+      _addressSuggestions = [];
+    });
+
+    // Get address for tapped location
+    _geocodingService.reverseGeocode(latlng.latitude, latlng.longitude).then((suggestion) {
+      if (suggestion != null && mounted) {
+        print('Reverse geocoded address: ${suggestion.displayName}');
+        // Remove listener temporarily to avoid triggering search
+        _addressController.removeListener(_onAddressChanged);
+        _addressController.text = suggestion.displayName;
+        _addressController.addListener(_onAddressChanged);
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -59,8 +184,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             ? null
             : _websiteController.text.trim(),
         address: _addressController.text.trim(),
-        lat: widget.lat,
-        lng: widget.lng,
+        lat: _currentLat,
+        lng: _currentLng,
         rentPrice: int.tryParse(_rentController.text.trim()) ?? 0,
         utilityPrice: int.tryParse(_utilityController.text.trim()) ?? 0,
         commonCost: int.tryParse(_commonCostController.text.trim()) ?? 0,
@@ -101,6 +226,62 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 Text(_error!, style: const TextStyle(color: Colors.red)),
                 const SizedBox(height: 12),
               ],
+
+              // Interactive Map
+              _buildSectionCard(
+                title: 'Hely kiválasztása',
+                emoji: '🗺️',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Koppints a térképre a pontos hely kijelöléséhez',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        height: 250,
+                        child: FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: LatLng(_currentLat, _currentLng),
+                            initialZoom: 15.0,
+                            onTap: _onMapTap,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.example.rent_map',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: LatLng(_currentLat, _currentLng),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_pin,
+                                    size: 40,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Address Search with Autocomplete
+              _buildAddressSearchField(),
+              const SizedBox(height: 16),
+
               _buildTextField(
                 controller: _nameController,
                 label: 'Név / címke',
@@ -310,6 +491,117 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAddressSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: _showSuggestions
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _addressController,
+                focusNode: _addressFocusNode,
+                decoration: InputDecoration(
+                  labelText: '📍 Cím keresése',
+                  hintText: 'Írj be legalább 3 karaktert...',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  suffixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : _addressController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _addressController.clear();
+                                setState(() {
+                                  _showSuggestions = false;
+                                  _addressSuggestions = [];
+                                });
+                              },
+                            )
+                          : const Icon(Icons.search),
+                ),
+                validator: (v) =>
+                    v == null || v.isEmpty ? 'Kötelező mező' : null,
+                onTap: () {
+                  print('Address field tapped');
+                  // Show suggestions again if we have text
+                  if (_addressController.text.length >= 3 && _addressSuggestions.isNotEmpty) {
+                    setState(() {
+                      _showSuggestions = true;
+                    });
+                  }
+                },
+              ),
+              if (_showSuggestions && _addressSuggestions.isNotEmpty)
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _addressSuggestions.length,
+                    itemBuilder: (context, index) {
+                      final suggestion = _addressSuggestions[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.location_on, size: 20),
+                        title: Text(
+                          suggestion.shortAddress,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          suggestion.displayName,
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _selectAddress(suggestion),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_showSuggestions && _addressSuggestions.isEmpty && !_isSearching)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 16),
+            child: Text(
+              'Nincs találat',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
+      ],
     );
   }
 }

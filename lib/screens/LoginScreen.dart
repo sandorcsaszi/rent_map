@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,11 +9,41 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   bool _loading = false;
   String? _error;
 
   final supabase = Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    // iOS-en figyeljük, ha visszatérünk az alkalmazásba
+    if (Platform.isIOS) {
+      WidgetsBinding.instance.addObserver(this);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (Platform.isIOS) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Ha iOS-en visszatérünk az alkalmazásba (Safari bezárása után)
+    if (Platform.isIOS && state == AppLifecycleState.resumed) {
+      // Ellenőrizzük, hogy sikerült-e a bejelentkezés
+      if (_loading && mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
 
   Future<void> _signIn(OAuthProvider provider) async {
     setState(() {
@@ -21,17 +52,33 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await supabase.auth.signInWithOAuth(
+      // iOS-en az externalApplication módot használjuk, ami automatikusan bezárja a Safari-t
+      final result = await supabase.auth.signInWithOAuth(
         provider,
         redirectTo: 'com.albiterkep.app://auth-callback/',
+        authScreenLaunchMode: Platform.isIOS
+            ? LaunchMode.externalApplication
+            : LaunchMode.platformDefault,
       );
+
+      // Debug: naplózzuk a választ
+      debugPrint('OAuth result: $result');
+
+      if (!result && mounted) {
+        setState(() {
+          _error = 'A bejelentkezés megszakadt';
+          _loading = false;
+        });
+      }
+      // Ha sikeres, az onAuthStateChange listener fogja kezelni a navigációt
+      // A Safari automatikusan bezáródik és visszairányít az alkalmazásba
     } catch (e) {
-      setState(() {
-        _error = 'Login failed: $e';
-      });
-    } finally {
+      debugPrint('OAuth error: $e');
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _error = 'Bejelentkezési hiba: $e';
+          _loading = false;
+        });
       }
     }
   }
