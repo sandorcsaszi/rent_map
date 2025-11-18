@@ -5,26 +5,60 @@ class PlaceService {
   final _client = Supabase.instance.client;
 
   Future<Map<String, dynamic>?> fetchProfile() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return null;
+    try {
+      // Ensure we have a valid session
+      final session = _client.auth.currentSession;
+      if (session == null) {
+        print('No active session');
+        return null;
+      }
 
-    final response = await _client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-    return response as Map<String, dynamic>?;
+      final user = _client.auth.currentUser;
+      if (user == null) {
+        print('No current user');
+        return null;
+      }
+
+      final response = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      print('Error fetching profile: $e');
+      // Return null instead of throwing to allow graceful fallback
+      return null;
+    }
   }
 
   Future<void> updateProfileName(String name) async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
+    try {
+      // Check session first
+      final session = _client.auth.currentSession;
+      if (session == null) {
+        throw Exception('No active session - please login again');
+      }
 
-    await _client.from('profiles').upsert({
-      'id': user.id,
-      'name': name,
-      'updated_at': DateTime.now().toIso8601String(),
-    });
+      final user = _client.auth.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user');
+      }
+
+      await _client.from('profiles').upsert({
+        'id': user.id,
+        'full_name': name,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      print('Error updating profile: $e');
+      // Re-throw with more context
+      if (e.toString().contains('oauth_client_id') ||
+          e.toString().contains('AuthRetryableFetchException')) {
+        throw Exception('Session expired - please login again');
+      }
+      rethrow;
+    }
   }
 
   Future<List<Place>> getUserPlaces() async {
@@ -38,7 +72,7 @@ class PlaceService {
         .select()
         .eq('user_id', user.id);
 
-    // Debug: naplózzuk a nyers adatokat
+    // Debug: log raw data
     print('Places raw data: $response');
 
     try {
@@ -94,3 +128,4 @@ class PlaceService {
     await _client.from('places').insert(payload).select().single();
   }
 }
+

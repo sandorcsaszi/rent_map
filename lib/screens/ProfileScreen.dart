@@ -43,15 +43,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final profile = await _placeService.fetchProfile();
-      final currentName = profile?['name'] as String? ?? widget.session.user.email ?? 'Felhasználó';
-      _nameController.text = currentName;
+      final currentSession = Supabase.instance.client.auth.currentSession;
+      if (currentSession == null) {
+        if (mounted) {
+          setState(() {
+            _error = 'Session lejárt. Kérlek jelentkezz be újra.';
+            _loadingProfile = false;
+          });
+        }
+        return;
+      }
+
+      String currentName = widget.session.user.userMetadata?['full_name'] as String?
+          ?? widget.session.user.email
+          ?? 'Felhasználó';
+
+      try {
+        final profile = await _placeService.fetchProfile();
+        if (profile != null && profile['full_name'] != null) {
+          currentName = profile['full_name'] as String;
+        }
+      } catch (profileError) {
+      }
+
+      if (mounted) {
+        _nameController.text = currentName;
+      }
     } catch (e) {
-      setState(() {
-        _error = 'Nem sikerült betölteni a profilt: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Nem sikerült betölteni a profilt: $e';
+        });
+      }
     } finally {
-      setState(() => _loadingProfile = false);
+      if (mounted) {
+        setState(() => _loadingProfile = false);
+      }
     }
   }
 
@@ -62,6 +89,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      final currentSession = Supabase.instance.client.auth.currentSession;
+      if (currentSession == null) {
+        if (mounted) {
+          setState(() {
+            _error = 'Session lejárt. Kérlek jelentkezz be újra.';
+            _saving = false;
+          });
+        }
+        return;
+      }
+
       await _placeService.updateProfileName(_nameController.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -69,9 +107,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } catch (e) {
-      setState(() {
-        _error = 'Nem sikerült menteni: $e';
-      });
+      final errorMessage = e.toString();
+      if (errorMessage.contains('oauth_client_id') || errorMessage.contains('AuthRetryableFetchException')) {
+        if (mounted) {
+          setState(() {
+            _error = 'Session lejárt. Kérlek jelentkezz be újra.';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Session lejárt'),
+              action: SnackBarAction(
+                label: 'Kijelentkezés',
+                onPressed: _logout,
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _error = 'Nem sikerült menteni: $e';
+          });
+        }
+      }
     } finally {
       if (mounted) {
         setState(() => _saving = false);
