@@ -1,16 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'dart:async';
+import 'package:rent_map/models/place.dart';
 
-import '../services/PlaceService.dart';
 import '../services/GeocodingService.dart';
+import '../services/PlaceService.dart';
 
 class AddPlaceScreen extends StatefulWidget {
-  final double lat;
-  final double lng;
+  final double? lat;
+  final double? lng;
+  final Place? place; // Make place optional
 
-  const AddPlaceScreen({super.key, required this.lat, required this.lng});
+  const AddPlaceScreen({super.key, this.lat, this.lng, this.place})
+    : assert(
+        (lat != null && lng != null) || place != null,
+        'Either lat/lng or a place must be provided.',
+      );
 
   @override
   State<AddPlaceScreen> createState() => _AddPlaceScreenState();
@@ -36,6 +43,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   final _mapController = MapController();
   final _addressFocusNode = FocusNode();
 
+  // Getter to check if we are in edit mode
+  bool get _isEditing => widget.place != null;
+
   // Map and geocoding state
   late double _currentLat;
   late double _currentLng;
@@ -47,14 +57,32 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   void initState() {
     super.initState();
-    _currentLat = widget.lat;
-    _currentLng = widget.lng;
+
+    if (_isEditing) {
+      // Edit mode: populate fields from the place
+      final place = widget.place!;
+      _currentLat = place.lat;
+      _currentLng = place.lng;
+
+      _nameController.text = place.name;
+      _descController.text = place.desc;
+      _websiteController.text = place.website ?? '';
+      _addressController.text = place.address;
+      _rentController.text = place.rentPrice.toString();
+      _utilityController.text = place.utilityPrice.toString();
+      _commonCostController.text = place.commonCost.toString();
+      _floorController.text = place.floor.toString();
+      _hasElevator = place.hasElevator;
+    } else {
+      // Create mode: use initial coordinates
+      _currentLat = widget.lat!;
+      _currentLng = widget.lng!;
+      // Get initial address from coordinates
+      _loadInitialAddress();
+    }
 
     // Listen to address field changes for autocomplete
     _addressController.addListener(_onAddressChanged);
-
-    // Get initial address from coordinates
-    _loadInitialAddress();
   }
 
   @override
@@ -73,7 +101,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   Future<void> _loadInitialAddress() async {
-    final suggestion = await _geocodingService.reverseGeocode(_currentLat, _currentLng);
+    final suggestion = await _geocodingService.reverseGeocode(
+      _currentLat,
+      _currentLng,
+    );
     if (suggestion != null && mounted) {
       // Remove listener temporarily to avoid triggering search
       _addressController.removeListener(_onAddressChanged);
@@ -145,7 +176,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     });
 
     // Get address for tapped location
-    _geocodingService.reverseGeocode(latlng.latitude, latlng.longitude).then((suggestion) {
+    _geocodingService.reverseGeocode(latlng.latitude, latlng.longitude).then((
+      suggestion,
+    ) {
       if (suggestion != null && mounted) {
         // Remove listener temporarily to avoid triggering search
         _addressController.removeListener(_onAddressChanged);
@@ -164,22 +197,51 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     });
 
     try {
-      await _placeService.createPlace(
-        name: _nameController.text.trim(),
-        title: _nameController.text.trim(),
-        desc: _descController.text.trim(),
-        website: _websiteController.text.trim().isEmpty
-            ? null
-            : _websiteController.text.trim(),
-        address: _addressController.text.trim(),
-        lat: _currentLat,
-        lng: _currentLng,
-        rentPrice: int.tryParse(_rentController.text.trim()) ?? 0,
-        utilityPrice: int.tryParse(_utilityController.text.trim()) ?? 0,
-        commonCost: int.tryParse(_commonCostController.text.trim()) ?? 0,
-        floor: int.tryParse(_floorController.text.trim()) ?? 0,
-        hasElevator: _hasElevator,
-      );
+      final name = _nameController.text.trim();
+      final desc = _descController.text.trim();
+      final website = _websiteController.text.trim().isEmpty
+          ? null
+          : _websiteController.text.trim();
+      final address = _addressController.text.trim();
+      final rentPrice = int.tryParse(_rentController.text.trim()) ?? 0;
+      final utilityPrice = int.tryParse(_utilityController.text.trim()) ?? 0;
+      final commonCost = int.tryParse(_commonCostController.text.trim()) ?? 0;
+      final floor = int.tryParse(_floorController.text.trim()) ?? 0;
+
+      if (_isEditing) {
+        // Update existing place
+        await _placeService.updatePlace(
+          id: widget.place!.id,
+          name: name,
+          title: name, // Assuming title is same as name
+          desc: desc,
+          website: website,
+          address: address,
+          lat: _currentLat,
+          lng: _currentLng,
+          rentPrice: rentPrice,
+          utilityPrice: utilityPrice,
+          commonCost: commonCost,
+          floor: floor,
+          hasElevator: _hasElevator,
+        );
+      } else {
+        // Create new place
+        await _placeService.createPlace(
+          name: name,
+          title: name,
+          desc: desc,
+          website: website,
+          address: address,
+          lat: _currentLat,
+          lng: _currentLng,
+          rentPrice: rentPrice,
+          utilityPrice: utilityPrice,
+          commonCost: commonCost,
+          floor: floor,
+          hasElevator: _hasElevator,
+        );
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(true); // indicate success to caller
@@ -199,7 +261,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
-        title: const Text('Új hely hozzáadása'),
+        title: Text(_isEditing ? 'Hely szerkesztése' : 'Új hely hozzáadása'),
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.black,
@@ -240,7 +302,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           ),
                           children: [
                             TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'com.example.rent_map',
                             ),
                             MarkerLayer(
@@ -364,7 +427,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _loading ? null : _submit,
                       icon: const Icon(Icons.check_box),
-                      label: const Text('Hozzáadás'),
+                      label: Text(_isEditing ? 'Mentés' : 'Hozzáadás'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -528,23 +591,24 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           ),
                         )
                       : _addressController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _addressController.clear();
-                                setState(() {
-                                  _showSuggestions = false;
-                                  _addressSuggestions = [];
-                                });
-                              },
-                            )
-                          : const Icon(Icons.search),
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _addressController.clear();
+                            setState(() {
+                              _showSuggestions = false;
+                              _addressSuggestions = [];
+                            });
+                          },
+                        )
+                      : const Icon(Icons.search),
                 ),
                 validator: (v) =>
                     v == null || v.isEmpty ? 'Kötelező mező' : null,
                 onTap: () {
                   // Show suggestions again if we have text
-                  if (_addressController.text.length >= 3 && _addressSuggestions.isNotEmpty) {
+                  if (_addressController.text.length >= 3 &&
+                      _addressSuggestions.isNotEmpty) {
                     setState(() {
                       _showSuggestions = true;
                     });

@@ -1,5 +1,5 @@
 class Place {
-  final int id;
+  final String id;
   final String userId;
   final String name;
   final String title;
@@ -49,7 +49,7 @@ class Place {
     }
 
     return Place(
-      id: _parseInt(json['id']),
+      id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       lat: _parseDouble(json['lat']),
@@ -62,7 +62,8 @@ class Place {
       utilityPrice: _parseInt(json['utility_cost'] ?? json['utility_price']),
       commonCost: _parseInt(json['common_cost'] ?? json['Common_cost']),
       floor: _parseInt(json['floor']),
-      hasElevator: json['has_elevator'] == true || json['has_elevator'] == 'true',
+      hasElevator:
+          json['has_elevator'] == true || json['has_elevator'] == 'true',
     );
   }
 }

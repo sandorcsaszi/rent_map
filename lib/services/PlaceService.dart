@@ -127,5 +127,42 @@ class PlaceService {
 
     await _client.from('places').insert(payload).select().single();
   }
-}
 
+  Future<void> updatePlace({
+    required String id,
+    required String name,
+    required String title,
+    required String desc,
+    required String? website,
+    required String address,
+    required double lat,
+    required double lng,
+    required int rentPrice,
+    required int utilityPrice,
+    required int commonCost,
+    required int floor,
+    required bool hasElevator,
+  }) async {
+    final payload = {
+      'name': name,
+      'lat': lat,
+      'lng': lng,
+      'title': title,
+      'description': desc,
+      'link': website,
+      'address': address,
+      'rent_price': rentPrice,
+      'utility_cost': utilityPrice,
+      'common_cost': commonCost,
+      'floor': floor,
+      'has_elevator': hasElevator,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    await _client.from('places').update(payload).eq('id', id);
+  }
+
+  Future<void> deletePlace(String id) async {
+    await _client.from('places').delete().eq('id', id);
+  }
+}
