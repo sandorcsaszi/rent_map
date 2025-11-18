@@ -5,20 +5,28 @@ class PlaceListSheet extends StatelessWidget {
   final List<Place> places;
   final Future<void> Function()? onRefresh;
   final void Function(Place)? onPlaceTap;
+  final double maxChildSize;
+  final double initialChildSize;
+  final double minChildSize;
 
   const PlaceListSheet({
     super.key,
     required this.places,
     this.onRefresh,
     this.onPlaceTap,
+    this.maxChildSize = 0.9,
+    this.initialChildSize = 0.15,
+    this.minChildSize = 0.15,
   });
 
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.25,
-      minChildSize: 0.15,
-      maxChildSize: 0.85,
+      initialChildSize: initialChildSize,
+      minChildSize: minChildSize,
+      maxChildSize: maxChildSize,
+      snap: true,
+      snapSizes: const [0.15, 0.5, 0.9],
       builder: (context, scrollController) {
         return Container(
           decoration: const BoxDecoration(
@@ -28,47 +36,41 @@ class PlaceListSheet extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[400],
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 4,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.apartment, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Talált helyek: ${places.length}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: onRefresh ?? () async {},
-                  child: ListView.builder(
-                    controller: scrollController, // important!
-                    itemCount: places.length,
-                    itemBuilder: (context, index) {
-                      final p = places[index];
-                      return _PlaceListTile(
-                        place: p,
-                        onTap: () => onPlaceTap?.call(p),
-                      );
-                    },
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    slivers: [
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _SheetHeaderDelegate(placeCount: places.length),
+                      ),
+                      if (places.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyPlacesPlaceholder(),
+                        )
+                      else
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final place = places[index];
+                              return _PlaceListTile(
+                                place: place,
+                                onTap: () => onPlaceTap?.call(place),
+                              );
+                            },
+                            childCount: places.length,
+                          ),
+                        ),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 100),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -76,6 +78,85 @@ class PlaceListSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final int placeCount;
+
+  const _SheetHeaderDelegate({required this.placeCount});
+
+  @override
+  double get minExtent => 72;
+
+  @override
+  double get maxExtent => 72;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                const Icon(Icons.apartment, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Talált helyek: $placeCount',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SheetHeaderDelegate oldDelegate) =>
+      oldDelegate.placeCount != placeCount;
+}
+
+class _EmptyPlacesPlaceholder extends StatelessWidget {
+  const _EmptyPlacesPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.location_off, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'Még nincsenek helyek',
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Koppints a + gombra új hely hozzáadásához',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

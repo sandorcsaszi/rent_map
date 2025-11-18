@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // iOS-en figyeljük, ha visszatérünk az alkalmazásba
     if (Platform.isIOS) {
       WidgetsBinding.instance.addObserver(this);
     }
@@ -34,9 +33,7 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Ha iOS-en visszatérünk az alkalmazásba (Safari bezárása után)
     if (Platform.isIOS && state == AppLifecycleState.resumed) {
-      // Ellenőrizzük, hogy sikerült-e a bejelentkezés
       if (_loading && mounted) {
         setState(() {
           _loading = false;
@@ -52,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
     });
 
     try {
-      // iOS-en az externalApplication módot használjuk, ami automatikusan bezárja a Safari-t
       final result = await supabase.auth.signInWithOAuth(
         provider,
         redirectTo: 'com.albiterkep.app://auth-callback/',
@@ -61,19 +57,13 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
             : LaunchMode.platformDefault,
       );
 
-      // Debug: naplózzuk a választ
-      debugPrint('OAuth result: $result');
-
       if (!result && mounted) {
         setState(() {
           _error = 'A bejelentkezés megszakadt';
           _loading = false;
         });
       }
-      // Ha sikeres, az onAuthStateChange listener fogja kezelni a navigációt
-      // A Safari automatikusan bezáródik és visszairányít az alkalmazásba
     } catch (e) {
-      debugPrint('OAuth error: $e');
       if (mounted) {
         setState(() {
           _error = 'Bejelentkezési hiba: $e';

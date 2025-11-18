@@ -75,7 +75,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   Future<void> _loadInitialAddress() async {
     final suggestion = await _geocodingService.reverseGeocode(_currentLat, _currentLng);
     if (suggestion != null && mounted) {
-      print('Got initial address: ${suggestion.displayName}');
       // Remove listener temporarily to avoid triggering search
       _addressController.removeListener(_onAddressChanged);
       _addressController.text = suggestion.displayName;
@@ -85,16 +84,13 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   void _onAddressChanged() {
     final text = _addressController.text;
-    print('Address changed: "$text" (length: ${text.length})');
 
     // Debounce the search to avoid too many API calls
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      print('Debounce timer fired for: "$text"');
       if (text.length >= 3) {
         _searchAddress(text);
       } else {
-        print('Text too short, clearing suggestions');
         if (mounted) {
           setState(() {
             _addressSuggestions = [];
@@ -106,11 +102,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   Future<void> _searchAddress(String query) async {
-    print('Searching for: "$query"');
     setState(() => _isSearching = true);
 
     final suggestions = await _geocodingService.searchAddress(query);
-    print('Got ${suggestions.length} suggestions');
 
     if (mounted) {
       setState(() {
@@ -118,13 +112,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         _showSuggestions = suggestions.isNotEmpty;
         _isSearching = false;
       });
-      print('Show suggestions: $_showSuggestions');
     }
   }
 
   void _selectAddress(AddressSuggestion suggestion) {
-    print('Selected address: ${suggestion.displayName}');
-
     // Cancel any pending debounce timer
     _debounceTimer?.cancel();
 
@@ -143,8 +134,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng latlng) {
-    print('Map tapped at: ${latlng.latitude}, ${latlng.longitude}');
-
     // Cancel any pending search
     _debounceTimer?.cancel();
 
@@ -158,7 +147,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     // Get address for tapped location
     _geocodingService.reverseGeocode(latlng.latitude, latlng.longitude).then((suggestion) {
       if (suggestion != null && mounted) {
-        print('Reverse geocoded address: ${suggestion.displayName}');
         // Remove listener temporarily to avoid triggering search
         _addressController.removeListener(_onAddressChanged);
         _addressController.text = suggestion.displayName;
@@ -555,7 +543,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 validator: (v) =>
                     v == null || v.isEmpty ? 'Kötelező mező' : null,
                 onTap: () {
-                  print('Address field tapped');
                   // Show suggestions again if we have text
                   if (_addressController.text.length >= 3 && _addressSuggestions.isNotEmpty) {
                     setState(() {

@@ -46,7 +46,6 @@ class GeocodingService {
   static const String _baseUrl = 'https://nominatim.openstreetmap.org';
   static const String _userAgent = 'AlbiterkapApp/1.0';
 
-  // Search for addresses based on query
   Future<List<AddressSuggestion>> searchAddress(String query) async {
     if (query.length < 3) return [];
 
@@ -56,7 +55,7 @@ class GeocodingService {
         'format': 'json',
         'addressdetails': '1',
         'limit': '5',
-        'countrycodes': 'hu', // Primarily Hungary, remove if you want worldwide
+        'countrycodes': 'hu',
       });
 
       final response = await http.get(
@@ -68,16 +67,13 @@ class GeocodingService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => AddressSuggestion.fromJson(json)).toList();
       } else {
-        print('Geocoding error: ${response.statusCode}');
         return [];
       }
-    } catch (e) {
-      print('Geocoding exception: $e');
+    } catch (_) {
       return [];
     }
   }
 
-  // Reverse geocoding - get address from coordinates
   Future<AddressSuggestion?> reverseGeocode(double lat, double lng) async {
     try {
       final url = Uri.parse('$_baseUrl/reverse').replace(queryParameters: {
@@ -96,13 +92,10 @@ class GeocodingService {
         final data = json.decode(response.body);
         return AddressSuggestion.fromJson(data);
       } else {
-        print('Reverse geocoding error: ${response.statusCode}');
         return null;
       }
-    } catch (e) {
-      print('Reverse geocoding exception: $e');
+    } catch (_) {
       return null;
     }
   }
 }
-

@@ -32,7 +32,6 @@ class Place {
   });
 
   factory Place.fromJson(Map<String, dynamic> json) {
-    // Helper function to safely parse int from any type
     int _parseInt(dynamic value, [int defaultValue = 0]) {
       if (value == null) return defaultValue;
       if (value is int) return value;
@@ -41,7 +40,6 @@ class Place {
       return defaultValue;
     }
 
-    // Helper function to safely parse double from any type
     double _parseDouble(dynamic value, [double defaultValue = 0.0]) {
       if (value == null) return defaultValue;
       if (value is double) return value;
