@@ -1,3 +1,4 @@
+// dart
 import 'package:flutter/material.dart';
 import '../models/place.dart';
 
@@ -21,6 +22,8 @@ class PlaceListSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Do not capture Theme here; resolve it inside the DraggableScrollableSheet
+    // builder so the sheet reacts to runtime theme changes immediately.
     return DraggableScrollableSheet(
       initialChildSize: initialChildSize,
       minChildSize: minChildSize,
@@ -28,16 +31,25 @@ class PlaceListSheet extends StatelessWidget {
       snap: true,
       snapSizes: const [0.15, 0.5, 0.9],
       builder: (context, scrollController) {
+        final theme = Theme.of(context);
+        final surface = theme.colorScheme.surface;
+        final shadowColor = theme.shadowColor.withAlpha((0.2 * 255).round());
+        // Pass a small theme hash into the header delegate so the sliver header
+        // knows to rebuild when theme changes (otherwise it only compares
+        // placeCount and might not rebuild on theme updates).
+        final themeHash = theme.colorScheme.hashCode;
+
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-            boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black26)],
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: [BoxShadow(blurRadius: 10, color: shadowColor)],
           ),
           child: Column(
             children: [
               Expanded(
                 child: RefreshIndicator(
+                  color: theme.colorScheme.primary,
                   onRefresh: onRefresh ?? () async {},
                   child: CustomScrollView(
                     controller: scrollController,
@@ -47,17 +59,17 @@ class PlaceListSheet extends StatelessWidget {
                     slivers: [
                       SliverPersistentHeader(
                         pinned: true,
-                        delegate: _SheetHeaderDelegate(placeCount: places.length),
+                        delegate: _SheetHeaderDelegate(placeCount: places.length, themeHash: themeHash),
                       ),
                       if (places.isEmpty)
-                        const SliverFillRemaining(
+                        SliverFillRemaining(
                           hasScrollBody: false,
                           child: _EmptyPlacesPlaceholder(),
                         )
                       else
                         SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) {
+                                (context, index) {
                               final place = places[index];
                               return _PlaceListTile(
                                 place: place,
@@ -84,8 +96,9 @@ class PlaceListSheet extends StatelessWidget {
 
 class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
   final int placeCount;
+  final int themeHash;
 
-  const _SheetHeaderDelegate({required this.placeCount});
+  _SheetHeaderDelegate({required this.placeCount, required this.themeHash});
 
   @override
   double get minExtent => 72;
@@ -95,8 +108,13 @@ class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final handleColor = theme.dividerColor;
+    final textStyle = theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: onSurface);
+
     return Container(
-      color: Colors.white,
+      color: theme.colorScheme.surface,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -106,7 +124,7 @@ class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
               width: 50,
               height: 5,
               decoration: BoxDecoration(
-                color: Colors.grey[400],
+                color: handleColor,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -115,11 +133,11 @@ class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               children: [
-                const Icon(Icons.apartment, size: 18),
+                Icon(Icons.apartment, size: 18, color: onSurface),
                 const SizedBox(width: 8),
                 Text(
                   'Talált helyek: $placeCount',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: textStyle,
                 ),
               ],
             ),
@@ -131,7 +149,7 @@ class _SheetHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _SheetHeaderDelegate oldDelegate) =>
-      oldDelegate.placeCount != placeCount;
+      oldDelegate.placeCount != placeCount || oldDelegate.themeHash != themeHash;
 }
 
 class _EmptyPlacesPlaceholder extends StatelessWidget {
@@ -139,20 +157,25 @@ class _EmptyPlacesPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconColor = theme.colorScheme.onSurface.withAlpha((0.4 * 255).round());
+    final titleStyle = theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.9 * 255).round()), fontSize: 16);
+    final subtitleStyle = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()), fontSize: 14);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.location_off, size: 48, color: Colors.grey[400]),
+          Icon(Icons.location_off, size: 48, color: iconColor),
           const SizedBox(height: 16),
           Text(
             'Még nincsenek helyek',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            style: titleStyle,
           ),
           const SizedBox(height: 8),
           Text(
             'Koppints a + gombra új hely hozzáadásához',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            style: subtitleStyle,
             textAlign: TextAlign.center,
           ),
         ],
@@ -169,23 +192,25 @@ class _PlaceListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final price = '${place.rentPrice} Ft/hó';
-    final extraCosts = (place.utilityPrice + place.commonCost) > 0
-        ? ' + rezsi'
-        : '';
+    final extraCosts = (place.utilityPrice + place.commonCost) > 0 ? ' + rezsi' : '';
+    final subtitleStyle = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()));
+    final trailingStyle = theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface);
 
     return ListTile(
-      title: Text(place.name),
+      title: Text(place.name, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface)),
       subtitle: Text(
         '${place.address}\n$price$extraCosts',
+        style: subtitleStyle,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       isThreeLine: true,
-      leading: Icon(place.hasElevator ? Icons.elevator : Icons.stairs),
+      leading: Icon(place.hasElevator ? Icons.elevator : Icons.stairs, color: theme.iconTheme.color),
       trailing: Text(
-        '${place.floor}. emelet',
-        style: const TextStyle(fontWeight: FontWeight.w500),
+        place.floor == 0 ? 'Földszint' : '${place.floor}. emelet',
+        style: trailingStyle,
       ),
       onTap: onTap,
     );

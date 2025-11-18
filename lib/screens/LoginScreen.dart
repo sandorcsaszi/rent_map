@@ -75,8 +75,13 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve theme here so colors update immediately when theme changes
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final mutedOnSurface = theme.colorScheme.onSurface.withAlpha((0.6 * 255).round());
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: surface,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -95,16 +100,16 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Jelentkezz be a folytatáshoz',
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 16, color: mutedOnSurface),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 if (_error != null) ...[
                   Text(
                     _error!,
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(color: theme.colorScheme.error),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -149,6 +154,7 @@ class _LoginButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SizedBox(
       height: 44,
       child: ElevatedButton.icon(
@@ -156,11 +162,11 @@ class _LoginButton extends StatelessWidget {
         icon: icon,
         label: Text(
           label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: theme.textTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w500),
         ),
         style: ElevatedButton.styleFrom(
           elevation: 4,
-          shadowColor: Colors.black12,
+          shadowColor: theme.shadowColor.withAlpha((0.07 * 255).round()),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),

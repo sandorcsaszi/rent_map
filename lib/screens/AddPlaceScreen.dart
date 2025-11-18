@@ -196,13 +196,20 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve theme inside build so colors update immediately when theme changes
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
+    final mutedOnSurface = onSurface.withAlpha((0.6 * 255).round());
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      // use surface (not deprecated) for scaffold background
+      backgroundColor: surface,
       appBar: AppBar(
         title: const Text('Új hely hozzáadása'),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black,
+        foregroundColor: onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -211,7 +218,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           child: Column(
             children: [
               if (_error != null) ...[
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
                 const SizedBox(height: 12),
               ],
 
@@ -222,9 +229,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Koppints a térképre a pontos hely kijelöléséhez',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      style: theme.textTheme.bodySmall?.copyWith(color: mutedOnSurface, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     ClipRRect(
@@ -413,7 +420,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
@@ -435,7 +442,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -443,7 +450,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         children: [
           Text(
             '$emoji  $title',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           child,
@@ -464,10 +471,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFE3F2FD) : Colors.white,
+          color: selected ? Theme.of(context).colorScheme.primary.withAlpha((0.12 * 255).round()) : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF1976D2) : Colors.grey.shade300,
+            color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
           ),
         ),
         child: Row(
@@ -483,17 +490,21 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   Widget _buildAddressSearchField() {
+    final theme = Theme.of(context);
+    final shadowAlpha = (0.1 * 255).round();
+    final mutedOnSurface = theme.colorScheme.onSurface.withAlpha((0.6 * 255).round());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: _showSuggestions
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withAlpha(shadowAlpha),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -509,7 +520,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   labelText: '📍 Cím keresése',
                   hintText: 'Írj be legalább 3 karaktert...',
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Theme.of(context).colorScheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -519,12 +530,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                     vertical: 12,
                   ),
                   suffixIcon: _isSearching
-                      ? const Padding(
+                      ? Padding(
                           padding: EdgeInsets.all(12.0),
                           child: SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary)),
                           ),
                         )
                       : _addressController.text.isNotEmpty
@@ -540,8 +551,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             )
                           : const Icon(Icons.search),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Kötelező mező' : null,
+                validator: (v) => v == null || v.isEmpty ? 'Kötelező mező' : null,
                 onTap: () {
                   // Show suggestions again if we have text
                   if (_addressController.text.length >= 3 && _addressSuggestions.isNotEmpty) {
@@ -564,11 +574,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                         leading: const Icon(Icons.location_on, size: 20),
                         title: Text(
                           suggestion.shortAddress,
-                          style: const TextStyle(fontSize: 14),
+                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                         ),
                         subtitle: Text(
                           suggestion.displayName,
-                          style: const TextStyle(fontSize: 12),
+                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -585,7 +595,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             padding: const EdgeInsets.only(top: 8, left: 16),
             child: Text(
               'Nincs találat',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              style: theme.textTheme.bodySmall?.copyWith(color: mutedOnSurface, fontSize: 12),
             ),
           ),
       ],
