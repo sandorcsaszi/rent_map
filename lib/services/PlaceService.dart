@@ -6,7 +6,6 @@ class PlaceService {
 
   Future<Map<String, dynamic>?> fetchProfile() async {
     try {
-      // Ensure we have a valid session
       final session = _client.auth.currentSession;
       if (session == null) {
         print('No active session');
@@ -27,14 +26,12 @@ class PlaceService {
       return response;
     } catch (e) {
       print('Error fetching profile: $e');
-      // Return null instead of throwing to allow graceful fallback
       return null;
     }
   }
 
   Future<void> updateProfileName(String name) async {
     try {
-      // Check session first
       final session = _client.auth.currentSession;
       if (session == null) {
         throw Exception('No active session - please login again');
@@ -52,7 +49,6 @@ class PlaceService {
       });
     } catch (e) {
       print('Error updating profile: $e');
-      // Re-throw with more context
       if (e.toString().contains('oauth_client_id') ||
           e.toString().contains('AuthRetryableFetchException')) {
         throw Exception('Session expired - please login again');
@@ -72,7 +68,6 @@ class PlaceService {
         .select()
         .eq('user_id', user.id);
 
-    // Debug: log raw data
     print('Places raw data: $response');
 
     try {

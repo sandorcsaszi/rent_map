@@ -1,4 +1,3 @@
-// dart
 import 'package:flutter/material.dart';
 import '../models/place.dart';
 
@@ -22,8 +21,6 @@ class PlaceListSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Do not capture Theme here; resolve it inside the DraggableScrollableSheet
-    // builder so the sheet reacts to runtime theme changes immediately.
     return DraggableScrollableSheet(
       initialChildSize: initialChildSize,
       minChildSize: minChildSize,
@@ -34,9 +31,6 @@ class PlaceListSheet extends StatelessWidget {
         final theme = Theme.of(context);
         final surface = theme.colorScheme.surface;
         final shadowColor = theme.shadowColor.withAlpha((0.2 * 255).round());
-        // Pass a small theme hash into the header delegate so the sliver header
-        // knows to rebuild when theme changes (otherwise it only compares
-        // placeCount and might not rebuild on theme updates).
         final themeHash = theme.colorScheme.hashCode;
 
         return Container(

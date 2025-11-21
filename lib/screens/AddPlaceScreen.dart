@@ -240,14 +240,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve theme inside build so colors update immediately when theme changes
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
     final onSurface = theme.colorScheme.onSurface;
     final mutedOnSurface = onSurface.withAlpha((0.6 * 255).round());
 
     return Scaffold(
-      // use surface (not deprecated) for scaffold background
       backgroundColor: surface,
       appBar: AppBar(
         title: Text(_isEditing ? 'Hely szerkesztése' : 'Új hely hozzáadása'),
@@ -266,7 +264,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 const SizedBox(height: 12),
               ],
 
-              // Interactive Map
               _buildSectionCard(
                 title: 'Hely kiválasztása',
                 emoji: '🗺️',
@@ -318,7 +315,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Address Search with Autocomplete
               _buildAddressSearchField(),
               const SizedBox(height: 16),
 
@@ -595,7 +591,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                 ),
                 validator: (v) => v == null || v.isEmpty ? 'Kötelező mező' : null,
                 onTap: () {
-                  // Show suggestions again if we have text
                   if (_addressController.text.length >= 3 &&
                       _addressSuggestions.isNotEmpty) {
                     setState(() {

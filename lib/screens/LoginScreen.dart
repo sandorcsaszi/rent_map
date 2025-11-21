@@ -75,7 +75,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve theme here so colors update immediately when theme changes
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
     final mutedOnSurface = theme.colorScheme.onSurface.withAlpha((0.6 * 255).round());

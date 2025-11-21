@@ -31,7 +31,6 @@ class _MapscreenState extends State<Mapscreen> {
   final BkkService _bkk_service = BkkService();
   final MapController _mapController = MapController();
   List<Place> _places = [];
-  // Search state
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _searchDebounceTimer;
@@ -40,13 +39,18 @@ class _MapscreenState extends State<Mapscreen> {
   bool _loadingBkk = false;
   Timer? _debounceTimer;
 
+  static const int _defaultMaxPrice = 500000;
+  RangeValues _rentRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  RangeValues _utilityRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  RangeValues _commonRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  bool _filterElevator = false;
+  int? _selectedFloor;
+
   @override
   void initState() {
     super.initState();
     _loadPlaces();
-    // Live search: listen to controller and debounce changes
     _searchController.addListener(_onSearchChanged);
-    // Load BKK stops after a short delay to ensure map is initialized
     if (widget.showBkkStops) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -95,7 +99,6 @@ class _MapscreenState extends State<Mapscreen> {
 
     final zoom = _mapController.camera.zoom;
 
-    // Don't load stops if zoom is below 14
     if (!_bkk_service.shouldShowStopsAtZoom(zoom)) {
       if (mounted) {
         setState(() {
@@ -167,7 +170,6 @@ class _MapscreenState extends State<Mapscreen> {
   }
 
   void _onSearchChanged() {
-    // Debounce typing to avoid excessive setState calls
     _searchDebounceTimer?.cancel();
     _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
@@ -180,17 +182,168 @@ class _MapscreenState extends State<Mapscreen> {
     });
   }
 
+  void _openFilterSheet() {
+    RangeValues tmpRent = _rentRange;
+    RangeValues tmpUtility = _utilityRange;
+    RangeValues tmpCommon = _commonRange;
+    bool tmpElevator = _filterElevator;
+    int? tmpFloor = _selectedFloor;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(builder: (context, setModalState) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.15),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Text('Szűrők', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Bérleti díj (Ft)',
+                  values: tmpRent,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpRent = v),
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Rezsi költség (Ft)',
+                  values: tmpUtility,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpUtility = v),
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Közös költség (Ft)',
+                  values: tmpCommon,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpCommon = v),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  title: const Text('Van lift'),
+                  value: tmpElevator,
+                  onChanged: (v) => setModalState(() => tmpElevator = v),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text('Emelet:'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButton<int?>(
+                        isExpanded: true,
+                        value: tmpFloor,
+                        items: [
+                          const DropdownMenuItem<int?>(value: null, child: Text('egyik sem')),
+                          for (var f = 0; f <= 10; f++)
+                            DropdownMenuItem<int?>(
+                              value: f,
+                              child: Text(f == 0 ? '0 — földszint' : '$f. emelet'),
+                            ),
+                        ],
+                        onChanged: (v) => setModalState(() => tmpFloor = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setModalState(() {
+                          tmpRent = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpUtility = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpCommon = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpElevator = false;
+                          tmpFloor = null;
+                        });
+                      },
+                      child: const Text('Alaphelyzet'),
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _rentRange = tmpRent;
+                          _utilityRange = tmpUtility;
+                          _commonRange = tmpCommon;
+                          _filterElevator = tmpElevator;
+                          _selectedFloor = tmpFloor;
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Alkalmaz'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildRangeFilterSection({
+    required String label,
+    required RangeValues values,
+    required double maxLimit,
+    required ValueChanged<RangeValues> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Text('${values.start.round()} Ft'),
+            const Spacer(),
+            Text('${values.end.round()} Ft'),
+          ],
+        ),
+        RangeSlider(
+          values: values,
+          min: 0,
+          max: maxLimit < 1 ? _defaultMaxPrice.toDouble() : maxLimit,
+          divisions: 20,
+          labels: RangeLabels('${values.start.round()}', '${values.end.round()}'),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // compute filtered places based on live search query
-    final filteredPlaces = _searchQuery.isEmpty
-        ? _places
-        : _places.where((p) => p.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    final filteredPlaces = _places.where((p) {
+      if (_searchQuery.isNotEmpty && !p.title.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
+      if (p.rentPrice < _rentRange.start.round() || p.rentPrice > _rentRange.end.round()) return false;
+      if (p.utilityPrice < _utilityRange.start.round() || p.utilityPrice > _utilityRange.end.round()) return false;
+      if (p.commonCost < _commonRange.start.round() || p.commonCost > _commonRange.end.round()) return false;
+      if (_filterElevator && !p.hasElevator) return false;
+      if (_selectedFloor != null && p.floor != _selectedFloor) return false;
+      return true;
+    }).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Albitérkép'),
-        // Add a visible, non-functional search bar under the title
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
@@ -222,13 +375,22 @@ class _MapscreenState extends State<Mapscreen> {
                         border: InputBorder.none,
                         isDense: true,
                         filled: true,
-                        // use surfaceContainerHighest to contrast with the outer container across themes
                         fillColor: theme.colorScheme.surfaceContainerHighest,
                         hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round())),
                         contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       style: theme.textTheme.bodyMedium,
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Szűrők',
+                    icon: Icon(
+                      Icons.filter_list,
+                      color: (_filterElevator || _selectedFloor != null || _rentRange.start > 0 || _rentRange.end < _defaultMaxPrice || _utilityRange.start > 0 || _utilityRange.end < _defaultMaxPrice || _commonRange.start > 0 || _commonRange.end < _defaultMaxPrice)
+                          ? theme.colorScheme.primary
+                          : theme.iconTheme.color,
+                    ),
+                    onPressed: _openFilterSheet,
                   ),
                 ],
               ),
@@ -243,8 +405,6 @@ class _MapscreenState extends State<Mapscreen> {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    // Prefer centering on the first filtered place (if any),
-                    // otherwise fall back to the first loaded place or the default coords.
                     initialCenter: filteredPlaces.isNotEmpty
                         ? LatLng(filteredPlaces.first.lat, filteredPlaces.first.lng)
                         : (_places.isNotEmpty
@@ -280,33 +440,11 @@ class _MapscreenState extends State<Mapscreen> {
                               child: _BkkStopMarker(
                                 color: markerColor,
                                 direction: stop.direction,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: markerColor.withOpacity(0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.directions_transit,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
                               ),
                             ),
                           );
                         }).toList(),
                       ),
-                    // Place markers layer (shown on top) — show only filtered places
                     MarkerLayer(
                       markers: filteredPlaces.map((place) {
                         return Marker(
@@ -400,7 +538,7 @@ class _MapscreenState extends State<Mapscreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: stop.primaryColor.withOpacity(0.2),
+                    color: stop.primaryColor.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -447,7 +585,7 @@ class _MapscreenState extends State<Mapscreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: route.color.withOpacity(0.3),
+                              color: route.color.withValues(alpha: 0.3),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -477,7 +615,7 @@ class _MapscreenState extends State<Mapscreen> {
                 children: stop.routeIds.map((routeId) {
                   return Chip(
                     label: Text(routeId),
-                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
                   );
                 }).toList(),
               ),
@@ -636,7 +774,6 @@ class _MapscreenState extends State<Mapscreen> {
   }
 }
 
-/// Custom marker widget for BKK stops with directional triangle indicator
 class _BkkStopMarker extends StatelessWidget {
   final Color color;
   final String? direction;
@@ -648,7 +785,6 @@ class _BkkStopMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Parse direction angle from string (e.g., "167", "-172")
     double? directionAngle;
     if (direction != null && direction!.isNotEmpty) {
       try {
@@ -661,7 +797,6 @@ class _BkkStopMarker extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Main circular marker
         Container(
           width: 32,
           height: 32,
@@ -683,12 +818,11 @@ class _BkkStopMarker extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        // Directional triangle indicator
         if (directionAngle != null)
           Transform.rotate(
-            angle: (directionAngle * 3.141592653589793) / 180.0, // Convert degrees to radians
+            angle: (directionAngle * 3.141592653589793) / 180.0,
             child: Transform.translate(
-              offset: const Offset(0, -18), // Position triangle outside the circle
+              offset: const Offset(0, -18),
               child: CustomPaint(
                 size: const Size(12, 8),
                 painter: _TrianglePainter(color: color),
@@ -700,7 +834,6 @@ class _BkkStopMarker extends StatelessWidget {
   }
 }
 
-/// Custom painter to draw a triangle pointing upward
 class _TrianglePainter extends CustomPainter {
   final Color color;
 
@@ -713,14 +846,13 @@ class _TrianglePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = ui.Path()
-      ..moveTo(size.width / 2, 0) // Top point
-      ..lineTo(0, size.height) // Bottom left
-      ..lineTo(size.width, size.height) // Bottom right
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height)
       ..close();
 
     canvas.drawPath(path, paint);
 
-    // Add white border
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
@@ -732,4 +864,3 @@ class _TrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(_TrianglePainter oldDelegate) => oldDelegate.color != color;
 }
-

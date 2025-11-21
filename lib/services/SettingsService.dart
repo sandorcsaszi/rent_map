@@ -50,4 +50,3 @@ class SettingsService {
     await prefs.setBool(_bkkKey, value);
   }
 }
-
