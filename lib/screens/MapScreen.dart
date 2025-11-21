@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -192,10 +193,13 @@ class _MapscreenState extends State<Mapscreen> {
 
                           return Marker(
                             point: LatLng(stop.lat, stop.lon),
-                            width: 32,
-                            height: 32,
+                            width: 40,
+                            height: 40,
                             child: GestureDetector(
                               onTap: () => _onBkkStopTap(stop),
+                              child: _BkkStopMarker(
+                                color: markerColor,
+                                direction: stop.direction,
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: markerColor.withOpacity(0.9),
@@ -341,21 +345,6 @@ class _MapscreenState extends State<Mapscreen> {
               ],
             ),
             const SizedBox(height: 16),
-            if (stop.direction != null) ...[
-              Row(
-                children: [
-                  const Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      stop.direction!,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
             if (stop.routes.isNotEmpty) ...[
               const Text(
                 'Járatok:',
@@ -566,3 +555,101 @@ class _MapscreenState extends State<Mapscreen> {
     }
   }
 }
+
+/// Custom marker widget for BKK stops with directional triangle indicator
+class _BkkStopMarker extends StatelessWidget {
+  final Color color;
+  final String? direction;
+
+  const _BkkStopMarker({
+    required this.color,
+    this.direction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Parse direction angle from string (e.g., "167", "-172")
+    double? directionAngle;
+    if (direction != null && direction!.isNotEmpty) {
+      try {
+        directionAngle = double.parse(direction!);
+      } catch (_) {
+        directionAngle = null;
+      }
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Main circular marker
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.9),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.directions_transit,
+            size: 16,
+            color: Colors.white,
+          ),
+        ),
+        // Directional triangle indicator
+        if (directionAngle != null)
+          Transform.rotate(
+            angle: (directionAngle * 3.141592653589793) / 180.0, // Convert degrees to radians
+            child: Transform.translate(
+              offset: const Offset(0, -18), // Position triangle outside the circle
+              child: CustomPaint(
+                size: const Size(12, 8),
+                painter: _TrianglePainter(color: color),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Custom painter to draw a triangle pointing upward
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = ui.Path()
+      ..moveTo(size.width / 2, 0) // Top point
+      ..lineTo(0, size.height) // Bottom left
+      ..lineTo(size.width, size.height) // Bottom right
+      ..close();
+
+    canvas.drawPath(path, paint);
+
+    // Add white border
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(_TrianglePainter oldDelegate) => oldDelegate.color != color;
+}
+
