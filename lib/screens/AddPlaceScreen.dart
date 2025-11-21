@@ -11,13 +11,10 @@ import '../services/PlaceService.dart';
 class AddPlaceScreen extends StatefulWidget {
   final double? lat;
   final double? lng;
-  final Place? place; // Make place optional
+  final Place? place;
 
   const AddPlaceScreen({super.key, this.lat, this.lng, this.place})
-    : assert(
-        (lat != null && lng != null) || place != null,
-        'Either lat/lng or a place must be provided.',
-      );
+    : assert((lat != null && lng != null) || place != null);
 
   @override
   State<AddPlaceScreen> createState() => _AddPlaceScreenState();
@@ -43,10 +40,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   final _mapController = MapController();
   final _addressFocusNode = FocusNode();
 
-  // Getter to check if we are in edit mode
   bool get _isEditing => widget.place != null;
 
-  // Map and geocoding state
   late double _currentLat;
   late double _currentLng;
   List<AddressSuggestion> _addressSuggestions = [];
@@ -59,7 +54,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     super.initState();
 
     if (_isEditing) {
-      // Edit mode: populate fields from the place
       final place = widget.place!;
       _currentLat = place.lat;
       _currentLng = place.lng;
@@ -74,14 +68,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       _floorController.text = place.floor.toString();
       _hasElevator = place.hasElevator;
     } else {
-      // Create mode: use initial coordinates
       _currentLat = widget.lat!;
       _currentLng = widget.lng!;
-      // Get initial address from coordinates
+
       _loadInitialAddress();
     }
 
-    // Listen to address field changes for autocomplete
     _addressController.addListener(_onAddressChanged);
   }
 
@@ -106,7 +98,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       _currentLng,
     );
     if (suggestion != null && mounted) {
-      // Remove listener temporarily to avoid triggering search
       _addressController.removeListener(_onAddressChanged);
       _addressController.text = suggestion.displayName;
       _addressController.addListener(_onAddressChanged);
@@ -116,7 +107,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   void _onAddressChanged() {
     final text = _addressController.text;
 
-    // Debounce the search to avoid too many API calls
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       if (text.length >= 3) {
@@ -147,7 +137,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   void _selectAddress(AddressSuggestion suggestion) {
-    // Cancel any pending debounce timer
     _debounceTimer?.cancel();
 
     setState(() {
@@ -157,15 +146,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       _addressSuggestions = [];
     });
 
-    // Set text after hiding suggestions to avoid retriggering search
     _addressController.text = suggestion.displayName;
 
-    // Animate map to new location
     _mapController.move(LatLng(suggestion.lat, suggestion.lng), 16.0);
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng latlng) {
-    // Cancel any pending search
     _debounceTimer?.cancel();
 
     setState(() {
@@ -175,12 +161,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       _addressSuggestions = [];
     });
 
-    // Get address for tapped location
     _geocodingService.reverseGeocode(latlng.latitude, latlng.longitude).then((
       suggestion,
     ) {
       if (suggestion != null && mounted) {
-        // Remove listener temporarily to avoid triggering search
         _addressController.removeListener(_onAddressChanged);
         _addressController.text = suggestion.displayName;
         _addressController.addListener(_onAddressChanged);
@@ -209,11 +193,10 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       final floor = int.tryParse(_floorController.text.trim()) ?? 0;
 
       if (_isEditing) {
-        // Update existing place
         await _placeService.updatePlace(
           id: widget.place!.id,
           name: name,
-          title: name, // Assuming title is same as name
+          title: name,
           desc: desc,
           website: website,
           address: address,
@@ -226,7 +209,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           hasElevator: _hasElevator,
         );
       } else {
-        // Create new place
         await _placeService.createPlace(
           name: name,
           title: name,
@@ -244,7 +226,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       }
 
       if (!mounted) return;
-      Navigator.of(context).pop(true); // indicate success to caller
+      Navigator.of(context).pop(true);
     } catch (e) {
       setState(() {
         _error = 'Hiba mentés közben: $e';
@@ -353,7 +335,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Részletes költségek
               _buildSectionCard(
                 title: 'Részletes költségek',
                 emoji: '💰',
@@ -381,7 +362,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Ingatlan részletek
               _buildSectionCard(
                 title: 'Ingatlan részletek',
                 emoji: '📚',
@@ -420,7 +400,6 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Bottom buttons
               Row(
                 children: [
                   Expanded(

@@ -39,7 +39,7 @@ class _MapscreenState extends State<Mapscreen> {
   void initState() {
     super.initState();
     _loadPlaces();
-    // Load BKK stops after a short delay to ensure map is initialized
+
     if (widget.showBkkStops) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -52,7 +52,7 @@ class _MapscreenState extends State<Mapscreen> {
   @override
   void didUpdateWidget(Mapscreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload BKK stops when toggle changes
+
     if (widget.showBkkStops != oldWidget.showBkkStops) {
       if (widget.showBkkStops) {
         _loadBkkStops();
@@ -71,10 +71,8 @@ class _MapscreenState extends State<Mapscreen> {
   }
 
   void _scheduleBkkStopsLoad() {
-    // Cancel previous timer
     _debounceTimer?.cancel();
 
-    // Schedule new load after 500ms
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
         _loadBkkStops();
@@ -87,7 +85,6 @@ class _MapscreenState extends State<Mapscreen> {
 
     final zoom = _mapController.camera.zoom;
 
-    // Don't load stops if zoom is below 14
     if (!_bkkService.shouldShowStopsAtZoom(zoom)) {
       if (mounted) {
         setState(() {
@@ -103,7 +100,6 @@ class _MapscreenState extends State<Mapscreen> {
       final radius = _bkkService.getRadiusForZoom(zoom);
 
       if (radius < 0) {
-        // Zoom too low, clear stops
         if (mounted) {
           setState(() {
             _bkkStops = [];
@@ -175,7 +171,6 @@ class _MapscreenState extends State<Mapscreen> {
                         : const LatLng(47.4979, 19.0402),
                     initialZoom: 16.0,
                     onMapEvent: (MapEvent event) {
-                      // Schedule BKK stops reload with 500ms debounce
                       if (widget.showBkkStops &&
                           (event is MapEventMoveEnd ||
                               event is MapEventScrollWheelZoom)) {
@@ -189,11 +184,10 @@ class _MapscreenState extends State<Mapscreen> {
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.rent_map',
                     ),
-                    // BKK stops layer (shown behind place markers)
+
                     if (widget.showBkkStops && _bkkStops.isNotEmpty)
                       MarkerLayer(
                         markers: _bkkStops.map((stop) {
-                          // Use the primary route color for the marker
                           final markerColor = stop.primaryColor;
 
                           return Marker(
@@ -228,7 +222,7 @@ class _MapscreenState extends State<Mapscreen> {
                           );
                         }).toList(),
                       ),
-                    // Place markers layer (shown on top)
+
                     MarkerLayer(
                       markers: _places.map((place) {
                         return Marker(
@@ -403,7 +397,6 @@ class _MapscreenState extends State<Mapscreen> {
                     .toList(),
               ),
             ] else if (stop.routeIds.isNotEmpty) ...[
-              // Fallback if routes are not parsed properly
               const Text(
                 'Járatok:',
                 style: TextStyle(fontWeight: FontWeight.w600),
@@ -427,7 +420,6 @@ class _MapscreenState extends State<Mapscreen> {
   }
 
   void _onPlaceMarkerTap(Place place) {
-    // Keep centering the map on the tapped marker
     _mapController.move(LatLng(place.lat, place.lng), 16.0);
 
     showDialog(
