@@ -200,27 +200,6 @@ class _MapscreenState extends State<Mapscreen> {
                               child: _BkkStopMarker(
                                 color: markerColor,
                                 direction: stop.direction,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: markerColor.withOpacity(0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.directions_transit,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
                               ),
                             ),
                           );
@@ -586,12 +565,12 @@ class _BkkStopMarker extends StatelessWidget {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.9),
+            color: color.withOpacity(0.9),
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: Colors.black.withOpacity(0.2),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -652,4 +631,3 @@ class _TrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(_TrianglePainter oldDelegate) => oldDelegate.color != color;
 }
-
