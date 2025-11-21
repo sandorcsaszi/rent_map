@@ -28,9 +28,13 @@ class Mapscreen extends StatefulWidget {
 
 class _MapscreenState extends State<Mapscreen> {
   final PlaceService _placeService = PlaceService();
-  final BkkService _bkkService = BkkService();
+  final BkkService _bkk_service = BkkService();
   final MapController _mapController = MapController();
   List<Place> _places = [];
+  // Search state
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  Timer? _searchDebounceTimer;
   List<BkkStop> _bkkStops = [];
   bool _isLoading = true;
   bool _loadingBkk = false;
@@ -40,7 +44,9 @@ class _MapscreenState extends State<Mapscreen> {
   void initState() {
     super.initState();
     _loadPlaces();
-
+    // Live search: listen to controller and debounce changes
+    _searchController.addListener(_onSearchChanged);
+    // Load BKK stops after a short delay to ensure map is initialized
     if (widget.showBkkStops) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -68,6 +74,9 @@ class _MapscreenState extends State<Mapscreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _searchDebounceTimer?.cancel();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -86,7 +95,8 @@ class _MapscreenState extends State<Mapscreen> {
 
     final zoom = _mapController.camera.zoom;
 
-    if (!_bkkService.shouldShowStopsAtZoom(zoom)) {
+    // Don't load stops if zoom is below 14
+    if (!_bkk_service.shouldShowStopsAtZoom(zoom)) {
       if (mounted) {
         setState(() {
           _bkkStops = [];
@@ -98,7 +108,7 @@ class _MapscreenState extends State<Mapscreen> {
     setState(() => _loadingBkk = true);
     try {
       final center = _mapController.camera.center;
-      final radius = _bkkService.getRadiusForZoom(zoom);
+      final radius = _bkk_service.getRadiusForZoom(zoom);
 
       if (radius < 0) {
         if (mounted) {
@@ -109,7 +119,7 @@ class _MapscreenState extends State<Mapscreen> {
         return;
       }
 
-      final stops = await _bkkService.getStopsForLocation(
+      final stops = await _bkk_service.getStopsForLocation(
         lat: center.latitude,
         lon: center.longitude,
         radius: radius,
@@ -156,10 +166,76 @@ class _MapscreenState extends State<Mapscreen> {
     }
   }
 
+  void _onSearchChanged() {
+    // Debounce typing to avoid excessive setState calls
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final q = _searchController.text.trim();
+      if (q != _searchQuery) {
+        setState(() {
+          _searchQuery = q;
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // compute filtered places based on live search query
+    final filteredPlaces = _searchQuery.isEmpty
+        ? _places
+        : _places.where((p) => p.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Albitérkép')),
+      appBar: AppBar(
+        title: const Text('Albitérkép'),
+        // Add a visible, non-functional search bar under the title
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(64),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withAlpha((0.04 * 255).round()),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: theme.iconTheme.color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      enabled: true,
+                      decoration: InputDecoration(
+                        hintText: 'Keresés...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        filled: true,
+                        // use surfaceContainerHighest to contrast with the outer container across themes
+                        fillColor: theme.colorScheme.surfaceContainerHighest,
+                        hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round())),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
@@ -167,9 +243,13 @@ class _MapscreenState extends State<Mapscreen> {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: _places.isNotEmpty
-                        ? LatLng(_places.first.lat, _places.first.lng)
-                        : const LatLng(47.4979, 19.0402),
+                    // Prefer centering on the first filtered place (if any),
+                    // otherwise fall back to the first loaded place or the default coords.
+                    initialCenter: filteredPlaces.isNotEmpty
+                        ? LatLng(filteredPlaces.first.lat, filteredPlaces.first.lng)
+                        : (_places.isNotEmpty
+                            ? LatLng(_places.first.lat, _places.first.lng)
+                            : const LatLng(47.4979, 19.0402)),
                     initialZoom: 16.0,
                     onMapEvent: (MapEvent event) {
                       if (widget.showBkkStops &&
@@ -226,9 +306,9 @@ class _MapscreenState extends State<Mapscreen> {
                           );
                         }).toList(),
                       ),
-
+                    // Place markers layer (shown on top) — show only filtered places
                     MarkerLayer(
-                      markers: _places.map((place) {
+                      markers: filteredPlaces.map((place) {
                         return Marker(
                           point: LatLng(place.lat, place.lng),
                           width: 40,
@@ -289,7 +369,7 @@ class _MapscreenState extends State<Mapscreen> {
                   ),
                 ),
                 PlaceListSheet(
-                  places: _places,
+                  places: filteredPlaces,
                   onRefresh: _loadPlaces,
                   onPlaceTap: _onPlaceMarkerTap,
                   maxChildSize: 0.9,
