@@ -31,7 +31,6 @@ class _MapscreenState extends State<Mapscreen> {
   final BkkService _bkk_service = BkkService();
   final MapController _mapController = MapController();
   List<Place> _places = [];
-  // Search state
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _searchDebounceTimer;
@@ -40,21 +39,18 @@ class _MapscreenState extends State<Mapscreen> {
   bool _loadingBkk = false;
   Timer? _debounceTimer;
 
-  // Filter state
-  static const int _defaultMaxPrice = 200000;
+  static const int _defaultMaxPrice = 500000;
   RangeValues _rentRange = RangeValues(0, _defaultMaxPrice.toDouble());
   RangeValues _utilityRange = RangeValues(0, _defaultMaxPrice.toDouble());
   RangeValues _commonRange = RangeValues(0, _defaultMaxPrice.toDouble());
   bool _filterElevator = false;
-  int? _selectedFloor; // null means 'egyik sem'
+  int? _selectedFloor;
 
   @override
   void initState() {
     super.initState();
     _loadPlaces();
-    // Live search: listen to controller and debounce changes
     _searchController.addListener(_onSearchChanged);
-    // Load BKK stops after a short delay to ensure map is initialized
     if (widget.showBkkStops) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -103,7 +99,6 @@ class _MapscreenState extends State<Mapscreen> {
 
     final zoom = _mapController.camera.zoom;
 
-    // Don't load stops if zoom is below 14
     if (!_bkk_service.shouldShowStopsAtZoom(zoom)) {
       if (mounted) {
         setState(() {
@@ -175,7 +170,6 @@ class _MapscreenState extends State<Mapscreen> {
   }
 
   void _onSearchChanged() {
-    // Debounce typing to avoid excessive setState calls
     _searchDebounceTimer?.cancel();
     _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
@@ -188,9 +182,7 @@ class _MapscreenState extends State<Mapscreen> {
     });
   }
 
-  // Open filter modal sheet
   void _openFilterSheet() {
-    // Temporary values so changes are applied only when user confirms
     RangeValues tmpRent = _rentRange;
     RangeValues tmpUtility = _utilityRange;
     RangeValues tmpCommon = _commonRange;
@@ -340,7 +332,6 @@ class _MapscreenState extends State<Mapscreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // compute filtered places based on live search query and active filters
     final filteredPlaces = _places.where((p) {
       if (_searchQuery.isNotEmpty && !p.title.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
       if (p.rentPrice < _rentRange.start.round() || p.rentPrice > _rentRange.end.round()) return false;
@@ -353,7 +344,6 @@ class _MapscreenState extends State<Mapscreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Albitérkép'),
-        // Add a visible, non-functional search bar under the title
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
@@ -385,7 +375,6 @@ class _MapscreenState extends State<Mapscreen> {
                         border: InputBorder.none,
                         isDense: true,
                         filled: true,
-                        // use surfaceContainerHighest to contrast with the outer container across themes
                         fillColor: theme.colorScheme.surfaceContainerHighest,
                         hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round())),
                         contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -393,7 +382,6 @@ class _MapscreenState extends State<Mapscreen> {
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
-                  // Filter button placed next to the search field
                   IconButton(
                     tooltip: 'Szűrők',
                     icon: Icon(
@@ -417,8 +405,6 @@ class _MapscreenState extends State<Mapscreen> {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    // Prefer centering on the first filtered place (if any),
-                    // otherwise fall back to the first loaded place or the default coords.
                     initialCenter: filteredPlaces.isNotEmpty
                         ? LatLng(filteredPlaces.first.lat, filteredPlaces.first.lng)
                         : (_places.isNotEmpty
@@ -459,7 +445,6 @@ class _MapscreenState extends State<Mapscreen> {
                           );
                         }).toList(),
                       ),
-                    // Place markers layer (shown on top) — show only filtered places
                     MarkerLayer(
                       markers: filteredPlaces.map((place) {
                         return Marker(
@@ -789,7 +774,6 @@ class _MapscreenState extends State<Mapscreen> {
   }
 }
 
-/// Custom marker widget for BKK stops with directional triangle indicator
 class _BkkStopMarker extends StatelessWidget {
   final Color color;
   final String? direction;
@@ -801,7 +785,6 @@ class _BkkStopMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Parse direction angle from string (e.g., "167", "-172")
     double? directionAngle;
     if (direction != null && direction!.isNotEmpty) {
       try {
@@ -814,7 +797,6 @@ class _BkkStopMarker extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Main circular marker
         Container(
           width: 32,
           height: 32,
@@ -836,12 +818,11 @@ class _BkkStopMarker extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        // Directional triangle indicator
         if (directionAngle != null)
           Transform.rotate(
-            angle: (directionAngle * 3.141592653589793) / 180.0, // Convert degrees to radians
+            angle: (directionAngle * 3.141592653589793) / 180.0,
             child: Transform.translate(
-              offset: const Offset(0, -18), // Position triangle outside the circle
+              offset: const Offset(0, -18),
               child: CustomPaint(
                 size: const Size(12, 8),
                 painter: _TrianglePainter(color: color),
@@ -853,7 +834,6 @@ class _BkkStopMarker extends StatelessWidget {
   }
 }
 
-/// Custom painter to draw a triangle pointing upward
 class _TrianglePainter extends CustomPainter {
   final Color color;
 
@@ -866,14 +846,13 @@ class _TrianglePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = ui.Path()
-      ..moveTo(size.width / 2, 0) // Top point
-      ..lineTo(0, size.height) // Bottom left
-      ..lineTo(size.width, size.height) // Bottom right
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height)
       ..close();
 
     canvas.drawPath(path, paint);
 
-    // Add white border
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
