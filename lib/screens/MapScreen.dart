@@ -35,6 +35,14 @@ class _MapscreenState extends State<Mapscreen> {
   bool _loadingBkk = false;
   Timer? _debounceTimer;
 
+  // Filter state
+  static const int _defaultMaxPrice = 200000;
+  RangeValues _rentRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  RangeValues _utilityRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  RangeValues _commonRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  bool _filterElevator = false;
+  int? _selectedFloor; // null means 'egyik sem'
+
   @override
   void initState() {
     super.initState();
@@ -176,13 +184,168 @@ class _MapscreenState extends State<Mapscreen> {
     });
   }
 
+  // Open filter modal sheet
+  void _openFilterSheet() {
+    // Temporary values so changes are applied only when user confirms
+    RangeValues tmpRent = _rentRange;
+    RangeValues tmpUtility = _utilityRange;
+    RangeValues tmpCommon = _commonRange;
+    bool tmpElevator = _filterElevator;
+    int? tmpFloor = _selectedFloor;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(builder: (context, setModalState) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.15),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Text('Szűrők', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Bérleti díj (Ft)',
+                  values: tmpRent,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpRent = v),
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Rezsi költség (Ft)',
+                  values: tmpUtility,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpUtility = v),
+                ),
+                const SizedBox(height: 8),
+                _buildRangeFilterSection(
+                  label: 'Közös költség (Ft)',
+                  values: tmpCommon,
+                  maxLimit: _defaultMaxPrice.toDouble(),
+                  onChanged: (v) => setModalState(() => tmpCommon = v),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  title: const Text('Van lift'),
+                  value: tmpElevator,
+                  onChanged: (v) => setModalState(() => tmpElevator = v),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text('Emelet:'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButton<int?>(
+                        isExpanded: true,
+                        value: tmpFloor,
+                        items: [
+                          const DropdownMenuItem<int?>(value: null, child: Text('egyik sem')),
+                          for (var f = 0; f <= 10; f++)
+                            DropdownMenuItem<int?>(
+                              value: f,
+                              child: Text(f == 0 ? '0 — földszint' : '$f. emelet'),
+                            ),
+                        ],
+                        onChanged: (v) => setModalState(() => tmpFloor = v),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setModalState(() {
+                          tmpRent = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpUtility = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpCommon = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpElevator = false;
+                          tmpFloor = null;
+                        });
+                      },
+                      child: const Text('Alaphelyzet'),
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _rentRange = tmpRent;
+                          _utilityRange = tmpUtility;
+                          _commonRange = tmpCommon;
+                          _filterElevator = tmpElevator;
+                          _selectedFloor = tmpFloor;
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Alkalmaz'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildRangeFilterSection({
+    required String label,
+    required RangeValues values,
+    required double maxLimit,
+    required ValueChanged<RangeValues> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Text('${values.start.round()} Ft'),
+            const Spacer(),
+            Text('${values.end.round()} Ft'),
+          ],
+        ),
+        RangeSlider(
+          values: values,
+          min: 0,
+          max: maxLimit < 1 ? _defaultMaxPrice.toDouble() : maxLimit,
+          divisions: 20,
+          labels: RangeLabels('${values.start.round()}', '${values.end.round()}'),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // compute filtered places based on live search query
-    final filteredPlaces = _searchQuery.isEmpty
-        ? _places
-        : _places.where((p) => p.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    // compute filtered places based on live search query and active filters
+    final filteredPlaces = _places.where((p) {
+      if (_searchQuery.isNotEmpty && !p.title.toLowerCase().contains(_searchQuery.toLowerCase())) return false;
+      if (p.rentPrice < _rentRange.start.round() || p.rentPrice > _rentRange.end.round()) return false;
+      if (p.utilityPrice < _utilityRange.start.round() || p.utilityPrice > _utilityRange.end.round()) return false;
+      if (p.commonCost < _commonRange.start.round() || p.commonCost > _commonRange.end.round()) return false;
+      if (_filterElevator && !p.hasElevator) return false;
+      if (_selectedFloor != null && p.floor != _selectedFloor) return false;
+      return true;
+    }).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Albitérkép'),
@@ -225,6 +388,17 @@ class _MapscreenState extends State<Mapscreen> {
                       ),
                       style: theme.textTheme.bodyMedium,
                     ),
+                  ),
+                  // Filter button placed next to the search field
+                  IconButton(
+                    tooltip: 'Szűrők',
+                    icon: Icon(
+                      Icons.filter_list,
+                      color: (_filterElevator || _selectedFloor != null || _rentRange.start > 0 || _rentRange.end < _defaultMaxPrice || _utilityRange.start > 0 || _utilityRange.end < _defaultMaxPrice || _commonRange.start > 0 || _commonRange.end < _defaultMaxPrice)
+                          ? theme.colorScheme.primary
+                          : theme.iconTheme.color,
+                    ),
+                    onPressed: _openFilterSheet,
                   ),
                 ],
               ),
