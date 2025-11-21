@@ -454,27 +454,6 @@ class _MapscreenState extends State<Mapscreen> {
                               child: _BkkStopMarker(
                                 color: markerColor,
                                 direction: stop.direction,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: markerColor.withOpacity(0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.directions_transit,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
                               ),
                             ),
                           );
@@ -574,7 +553,7 @@ class _MapscreenState extends State<Mapscreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: stop.primaryColor.withOpacity(0.2),
+                    color: stop.primaryColor.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -621,7 +600,7 @@ class _MapscreenState extends State<Mapscreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: route.color.withOpacity(0.3),
+                              color: route.color.withValues(alpha: 0.3),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -651,7 +630,7 @@ class _MapscreenState extends State<Mapscreen> {
                 children: stop.routeIds.map((routeId) {
                   return Chip(
                     label: Text(routeId),
-                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
                   );
                 }).toList(),
               ),
@@ -906,4 +885,3 @@ class _TrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(_TrianglePainter oldDelegate) => oldDelegate.color != color;
 }
-
