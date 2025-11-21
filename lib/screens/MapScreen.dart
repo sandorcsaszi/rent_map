@@ -465,16 +465,17 @@ class _MapscreenState extends State<Mapscreen> {
                   ],
                 ),
                 if (widget.showBkkStops && _loadingBkk)
-                  const Positioned(
+                  Positioned(
                     top: 16,
                     right: 16,
                     child: Chip(
                       avatar: SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary)),
                       ),
-                      label: Text('BKK betöltése...'),
+                      label: Text('BKK betöltése...', style: theme.textTheme.bodyMedium),
+                      backgroundColor: theme.colorScheme.surface,
                     ),
                   ),
                 Positioned(
@@ -524,9 +525,9 @@ class _MapscreenState extends State<Mapscreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -593,8 +594,8 @@ class _MapscreenState extends State<Mapscreen> {
                         ),
                         child: Text(
                           route.shortName,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: route.color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -613,9 +614,11 @@ class _MapscreenState extends State<Mapscreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: stop.routeIds.map((routeId) {
+                  final t = Theme.of(context);
                   return Chip(
                     label: Text(routeId),
-                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                    backgroundColor: t.colorScheme.primary.withAlpha((0.1 * 255).round()),
+                    labelStyle: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onPrimary),
                   );
                 }).toList(),
               ),

@@ -52,9 +52,7 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
       final result = await supabase.auth.signInWithOAuth(
         provider,
         redirectTo: 'com.albiterkep.app://auth-callback/',
-        authScreenLaunchMode: Platform.isIOS
-            ? LaunchMode.externalApplication
-            : LaunchMode.platformDefault,
+        authScreenLaunchMode: LaunchMode.inAppWebView,
       );
 
       if (!result && mounted) {
