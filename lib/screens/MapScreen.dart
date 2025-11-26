@@ -40,9 +40,11 @@ class _MapscreenState extends State<Mapscreen> {
   Timer? _debounceTimer;
 
   static const int _defaultMaxPrice = 500000;
+  static const int _defaultUtilityMaxPrice = 100000;
+  static const int _defaultCommonMaxPrice = 100000;
   RangeValues _rentRange = RangeValues(0, _defaultMaxPrice.toDouble());
-  RangeValues _utilityRange = RangeValues(0, _defaultMaxPrice.toDouble());
-  RangeValues _commonRange = RangeValues(0, _defaultMaxPrice.toDouble());
+  RangeValues _utilityRange = RangeValues(0, _defaultUtilityMaxPrice.toDouble());
+  RangeValues _commonRange = RangeValues(0, _defaultCommonMaxPrice.toDouble());
   bool _filterElevator = false;
   int? _selectedFloor;
 
@@ -221,14 +223,14 @@ class _MapscreenState extends State<Mapscreen> {
                 _buildRangeFilterSection(
                   label: 'Rezsi költség (Ft)',
                   values: tmpUtility,
-                  maxLimit: _defaultMaxPrice.toDouble(),
+                  maxLimit: _defaultUtilityMaxPrice.toDouble(),
                   onChanged: (v) => setModalState(() => tmpUtility = v),
                 ),
                 const SizedBox(height: 8),
                 _buildRangeFilterSection(
                   label: 'Közös költség (Ft)',
                   values: tmpCommon,
-                  maxLimit: _defaultMaxPrice.toDouble(),
+                  maxLimit: _defaultCommonMaxPrice.toDouble(),
                   onChanged: (v) => setModalState(() => tmpCommon = v),
                 ),
                 const SizedBox(height: 8),
@@ -246,9 +248,11 @@ class _MapscreenState extends State<Mapscreen> {
                       child: DropdownButton<int?>(
                         isExpanded: true,
                         value: tmpFloor,
+                        itemHeight: 48.0,
+                        menuMaxHeight: 48.0 *3,
                         items: [
                           const DropdownMenuItem<int?>(value: null, child: Text('egyik sem')),
-                          for (var f = 0; f <= 10; f++)
+                          for (var f = 0; f <= 15; f++)
                             DropdownMenuItem<int?>(
                               value: f,
                               child: Text(f == 0 ? '0 — földszint' : '$f. emelet'),
@@ -266,8 +270,8 @@ class _MapscreenState extends State<Mapscreen> {
                       onPressed: () {
                         setModalState(() {
                           tmpRent = RangeValues(0, _defaultMaxPrice.toDouble());
-                          tmpUtility = RangeValues(0, _defaultMaxPrice.toDouble());
-                          tmpCommon = RangeValues(0, _defaultMaxPrice.toDouble());
+                          tmpUtility = RangeValues(0, _defaultUtilityMaxPrice.toDouble());
+                          tmpCommon = RangeValues(0, _defaultCommonMaxPrice.toDouble());
                           tmpElevator = false;
                           tmpFloor = null;
                         });
@@ -320,8 +324,8 @@ class _MapscreenState extends State<Mapscreen> {
         RangeSlider(
           values: values,
           min: 0,
-          max: maxLimit < 1 ? _defaultMaxPrice.toDouble() : maxLimit,
-          divisions: 20,
+          max: maxLimit,
+          divisions: 25,
           labels: RangeLabels('${values.start.round()}', '${values.end.round()}'),
           onChanged: onChanged,
         ),
@@ -386,7 +390,7 @@ class _MapscreenState extends State<Mapscreen> {
                     tooltip: 'Szűrők',
                     icon: Icon(
                       Icons.filter_list,
-                      color: (_filterElevator || _selectedFloor != null || _rentRange.start > 0 || _rentRange.end < _defaultMaxPrice || _utilityRange.start > 0 || _utilityRange.end < _defaultMaxPrice || _commonRange.start > 0 || _commonRange.end < _defaultMaxPrice)
+                      color: (_filterElevator || _selectedFloor != null || _rentRange.start > 0 || _rentRange.end < _defaultMaxPrice || _utilityRange.start > 0 || _utilityRange.end < _defaultUtilityMaxPrice || _commonRange.start > 0 || _commonRange.end < _defaultCommonMaxPrice)
                           ? theme.colorScheme.primary
                           : theme.iconTheme.color,
                     ),
